@@ -1,0 +1,43 @@
+{
+  "name": "wp-security-hub",
+  "version": "1.0.0",
+  "description": "WordPress security audit automation with AI-powered research agents",
+  "main": "dist/cli/index.js",
+  "bin": {
+    "wp-audit": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cli": "node dist/cli/index.js"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "better-sqlite3": "^11.6.0",
+    "sqlcipher": "npm:@journeyapps/sqlcipher",
+    "ssh2": "^1.16.0",
+    "openai": "^4.73.0",
+    "zod": "^3.23.8",
+    "yaml": "^2.6.0",
+    "docx": "^9.0.0",
+    "marked": "^14.1.0",
+    "ora": "^8.1.1",
+    "cli-progress": "^3.12.0",
+    "node-cron": "^3.0.3",
+    "chalk": "^5.3.0",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/ssh2": "^1.15.1",
+    "@types/node": "^22.7.0",
+    "@types/uuid": "^10.0.0",
+    "@types/node-cron": "^3.0.11",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0",
+    "electron": "^32.0.0",
+    "electron-builder": "^25.1.0"
+  }
+}
