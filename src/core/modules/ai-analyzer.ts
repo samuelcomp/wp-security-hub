@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { AiAnalysisResult } from '../../engine/types';
+import type { AiAnalysisResult } from '../engine/types';
 import type { Settings } from '../../config/settings';
 
 const SYSTEM_PROMPT = `You are a WordPress malware analyst. Classify the provided PHP code as:

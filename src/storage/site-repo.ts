@@ -37,7 +37,7 @@ function rowToSite(row: SiteRow): SiteConfig {
     id: row.id,
     domain: row.domain,
     connection: row.connection as ConnectionType,
-    credentials: dec(row.credentials) as SiteCredentials,
+    credentials: dec(row.credentials) as unknown as SiteCredentials,
     techStack: JSON.parse(row.tech_stack),
     healthScore: row.health_score,
     createdAt: row.created_at,
