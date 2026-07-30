@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
-declare global {
-  interface Window { electronAPI: any; }
-}
+const API = 'http://localhost:3456/api';
 
 type Page = 'dashboard' | 'sites' | 'site-detail' | 'settings';
 
@@ -26,6 +24,15 @@ const theme = {
   low: '#8b949e',
   info: '#6e7681',
 };
+
+async function api(path: string, opts?: { method?: string; body?: any }): Promise<any> {
+  const res = await fetch(`${API}${path}`, {
+    method: opts?.method || 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    body: opts?.body ? JSON.stringify(opts.body) : undefined,
+  });
+  return res.json();
+}
 
 // ─── Icons (inline SVG) ───
 const Icons = {
@@ -76,7 +83,7 @@ function UnlockScreen({ onUnlock }: { onUnlock: (password: string, rootDir: stri
 
   const handleSubmit = async () => {
     setLoading(true); setError('');
-    const res = await window.electronAPI.unlock(password, rootDir);
+    const res = await api('/unlock', { method: 'POST', body: { password, rootDir } });
     setLoading(false);
     if (res.ok) onUnlock(password, res.rootDir);
     else setError(res.error || 'Wrong passphrase');
@@ -169,7 +176,7 @@ function DashboardPage({ sites, onRunScan }: { sites: any[]; onRunScan: (id: str
       {sites.length === 0 ? (
         <Card style={{ textAlign: 'center', padding: 40 }}>
           <p style={{ color: theme.textMuted, marginBottom: 12 }}>No sites registered yet</p>
-          <button style={{ ...btn(theme.primary) }} onClick={() => window.electronAPI.sites.create({})}>Add Your First Site</button>
+          <button style={{ ...btn(theme.primary) }} onClick={() => api('/sites', { method: 'POST', body: {} })}>Add Your First Site</button>
         </Card>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
@@ -213,14 +220,14 @@ function SitesPage({ sites, onRefresh, onSelectSite }: { sites: any[]; onRefresh
 
   const handleAdd = async () => {
     setAdding(true);
-    await window.electronAPI.sites.create({ domain, connection: connType, credentials: creds });
+    await api('/sites', { method: 'POST', body: { domain, connection: connType, credentials: creds } });
     setShowAdd(false); setDomain(''); setCreds({});
     onRefresh();
     setAdding(false);
   };
 
   const handleDelete = async (id: string) => {
-    await window.electronAPI.sites.delete(id);
+    await api('/sites/' + id, { method: 'DELETE' });
     onRefresh();
   };
 
@@ -231,7 +238,7 @@ function SitesPage({ sites, onRefresh, onSelectSite }: { sites: any[]; onRefresh
   };
 
   const testConnection = async () => {
-    const res = await window.electronAPI.connections.test({ type: connType, credentials: { ...creds, port: parseInt(creds.port || connType === 'cpanel' ? '2083' : '22') } });
+    const res = await api('/connections/test', { method: 'POST', body: { type: connType, credentials: { ...creds, port: parseInt(creds.port || connType === 'cpanel' ? '2083' : '22') } } });
     alert(res.ok ? 'Connection successful!' : `Connection failed: ${res.error}`);
   };
 
@@ -315,39 +322,33 @@ function SiteDetailPage({ siteId, onBack }: { siteId: string; onBack: () => void
   const [selectedScan, setSelectedScan] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const s = await window.electronAPI.sites.get(siteId);
+    const s = await api('/sites/' + siteId);
     setSite(s);
-    const sc = await window.electronAPI.scans.list(siteId);
+    const sc = await api('/scans/' + siteId);
     setScans(sc);
     if (sc.length > 0) {
       setSelectedScan(sc[0].id);
-      const f = await window.electronAPI.findings.list(sc[0].id);
+      const f = await api('/findings/' + sc[0].id);
       setFindings(f);
     }
   }, [siteId]);
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    window.electronAPI.scans.onProgress((event: any) => {
-      setScanProgress(event);
-    });
-    return () => { window.electronAPI.scans.removeProgressListener(); };
-  }, []);
-
   const runScan = async () => {
     setScanning(true);
     setScanProgress({ siteId, domain: site?.domain, status: 'connecting' });
-    await window.electronAPI.scans.run(siteId);
+    const res = await api('/scans/' + siteId, { method: 'POST' });
     setScanning(false);
-    setScanProgress(null);
+    if (res.ok) setScanProgress({ siteId, domain: site?.domain, status: 'completed' });
+    else setScanProgress(null);
     load();
   };
 
   const handleFix = async () => {
     if (!selectedScan) return;
     setFixing(true);
-    const res = await window.electronAPI.fixes.applyAll(siteId, selectedScan);
+    const res = await api('/fixes/' + siteId + '/' + selectedScan, { method: 'POST' });
     setFixing(false);
     if (res.ok) {
       alert(`Fixed: ${res.fixed}, Failed: ${res.failed}`);
@@ -359,7 +360,7 @@ function SiteDetailPage({ siteId, onBack }: { siteId: string; onBack: () => void
 
   const selectScan = async (id: string) => {
     setSelectedScan(id);
-    const f = await window.electronAPI.findings.list(id);
+    const f = await api('/findings/' + id);
     setFindings(f);
   };
 
@@ -464,11 +465,11 @@ function SettingsPage() {
   const [settings, setSettings] = useState<any>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { window.electronAPI.settings.load().then(setSettings); }, []);
+  useEffect(() => { api('/settings').then(setSettings); }, []);
 
   const handleSave = async () => {
     setSaving(true);
-    await window.electronAPI.settings.save(settings);
+    await api('/settings', { method: 'PUT', body: settings });
     setSaving(false);
     alert('Settings saved');
   };
@@ -550,7 +551,7 @@ export default function App() {
   const [selectedSite, setSelectedSite] = useState<string | null>(null);
 
   const refreshSites = useCallback(async () => {
-    const s = await window.electronAPI.sites.list();
+    const s = await api('/sites');
     setSites(s || []);
   }, []);
 
