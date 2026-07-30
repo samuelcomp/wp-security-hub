@@ -194,9 +194,12 @@ app.use((_req, res) => {
   res.sendFile(path.join(rendererPath, 'index.html'));
 });
 
-const PORT = parseInt(process.env.PORT || '3456', 10);
+const PORT = parseInt(process.env.PORT || '0', 10);
 const server = createServer(app);
 server.listen(PORT, () => {
+  const addr = server.address();
+  const port = typeof addr === 'string' ? addr : addr?.port || 3456;
+  console.log(`WP_SECURITY_HUB_PORT=${port}`);
   console.log(`\n  WP Security Hub Dashboard running at:`);
-  console.log(`  \x1b[36mhttp://localhost:${PORT}\x1b[0m\n`);
+  console.log(`  \x1b[36mhttp://localhost:${port}\x1b[0m\n`);
 });

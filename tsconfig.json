@@ -17,5 +17,5 @@
     "moduleResolution": "node"
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "tests", "src/dashboard/main.ts", "src/dashboard/preload.ts"]
+  "exclude": ["node_modules", "dist", "tests"]
 }
