@@ -28,4 +28,18 @@ describe('Database', () => {
     closeDb();
     expect(() => openDb('wrong-passphrase', TEST_DB)).toThrow();
   });
+
+  it('initDb creates all required tables', () => {
+    const db = openDb('test-passphrase-123', TEST_DB);
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+      .all() as Array<{ name: string }>;
+    const names = tables.map((t: { name: string }) => t.name);
+    expect(names).toContain('sites');
+    expect(names).toContain('scans');
+    expect(names).toContain('findings');
+    expect(names).toContain('fix_history');
+    expect(names).toContain('schedules');
+    expect(names).toContain('vault_state');
+  });
 });
