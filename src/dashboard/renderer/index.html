@@ -498,9 +498,9 @@ function renderSettingsPage(main) {
 
     '<div class="card mb16">'+
     '<h3 class="fs14 fw600 mb16" style="display:flex;align-items:center;gap:8px">\u{1f916} AI Analysis</h3>'+
-    '<p class="fs12 mb16" style="color:var(--tm)">AI analyzes suspicious files to classify malware. Uses <a href="https://openrouter.ai" target="_blank" style="color:var(--p)">OpenRouter</a> — one API key, access to all models.</p>'+
+    '<p class="fs12 mb16" style="color:var(--tm)">AI-powered malware classification. Uses <a href="https://openrouter.ai" target="_blank" style="color:var(--p)">OpenRouter</a> API — one key, all models. <b>All other scans work without any API keys.</b></p>'+
     '<div class="flex flex-col gap12">'+
-    '<div><label class="lbl">OpenRouter API Key <span style="color:var(--tm)">(get free credits at openrouter.ai)</span></label><input class="inp" type="password" id="s-or-key" value="'+orKey+'" placeholder="sk-or-v1-..." style="font-family:monospace"></div>'+
+    '<div><label class="lbl">OpenRouter API Key <span style="color:var(--tm)">(get at openrouter.ai)</span></label><input class="inp" type="password" id="s-or-key" value="'+orKey+'" placeholder="sk-or-v1-..." style="font-family:monospace"></div>'+
     '<div><label class="lbl">AI Model</label><select class="inp" id="s-or-model">'+modelOpts+'</select></div>'+
     '</div>'+
     '<div class="flex gap8 aic mt12">'+
@@ -526,8 +526,6 @@ function doSaveSettings() {
   var settings = {
     apiKeys: {
       openrouter: {key: document.getElementById('s-or-key').value, model: document.getElementById('s-or-model').value},
-      virustotal: {key: document.getElementById('s-vt-key').value},
-      wpscan: {key: document.getElementById('s-wp-key').value}
     },
     maxParallelScans: parseInt(document.getElementById('s-max').value)||10,
     apiRateLimit: parseInt(document.getElementById('s-rate').value)||4,

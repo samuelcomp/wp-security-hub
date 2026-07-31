@@ -34,14 +34,10 @@ export const initCommand = new Command('init')
     console.log('\nDatabase initialized and encrypted.\n');
 
     const orKey = await ask('OpenRouter API key (optional): ');
-    const vtKey = await ask('VirusTotal API key (optional): ');
-    const wpsKey = await ask('WPScan API key (optional): ');
 
     const settings: Settings = {
       apiKeys: {
         openrouter: orKey ? { key: orKey, model: 'deepseek/deepseek-chat' } : undefined,
-        virustotal: vtKey ? { key: vtKey } : undefined,
-        wpscan: wpsKey ? { key: wpsKey } : undefined,
       },
       maxParallelScans: 10,
       apiRateLimit: 4,

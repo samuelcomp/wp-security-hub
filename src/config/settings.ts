@@ -4,10 +4,6 @@ import yaml from 'yaml';
 
 export interface ApiKeys {
   openrouter: { key: string; model: string };
-  virustotal: { key: string };
-  wpscan: { key: string };
-  sucuri: { key: string };
-  hackertarget: { key: string };
 }
 
 export interface Settings {
