@@ -7,7 +7,7 @@
     "wp-audit": "./dist/cli/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"const f=require('fs');f.copyFileSync('src/dashboard/renderer/index.html','dist/dashboard/renderer/index.html');f.copyFileSync('node_modules/react/umd/react.production.min.js','dist/dashboard/renderer/react.production.min.js');f.copyFileSync('node_modules/react-dom/umd/react-dom.production.min.js','dist/dashboard/renderer/react-dom.production.min.js')\"",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",

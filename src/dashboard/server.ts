@@ -22,6 +22,16 @@ import type { ConnectionType } from '../core/engine/types';
 const app = express();
 app.use(express.json());
 
+// Allow requests from file:// origin (Electron loads HTML from disk)
+app.use((_req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  if (_req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
+
+
 let currentRootDir = resolveRootDir();
 let unlocked = false;
 
@@ -82,8 +92,14 @@ app.get('/api/sites/:id', requireAuth, withError(async (req, res) => {
 }));
 
 app.post('/api/sites', requireAuth, withError(async (req, res) => {
-  const { domain, connection, credentials } = req.body;
+  const { domain, connection, credentials, folder } = req.body;
   const site = createSite(domain, connection as ConnectionType, credentials);
+  if (folder) {
+    const techStack = JSON.parse(JSON.stringify(site.techStack || {}));
+    techStack.folder = folder;
+    updateSite(site.id, { techStack });
+    site.techStack = techStack;
+  }
   res.json(site);
 }));
 
@@ -109,13 +125,14 @@ app.post('/api/scans/:siteId', requireAuth, withError(async (req, res) => {
   const result = await orchestrator.scanSite(siteId);
 
   const findings = listFindingsForScan(result.id);
-  const outputDir = path.join(currentRootDir, 'sites', siteId, 'reports');
+  const siteFolder = (site.techStack && (site.techStack as any).folder) || currentRootDir;
+  const outputDir = path.join(siteFolder, 'sites', siteId, 'reports');
   const docxGen = new DocxGenerator();
   await docxGen.generate(site, result, findings, outputDir);
   const mdGen = new MdGenerator();
   mdGen.generate(site, result, findings, outputDir);
   const writer = new FindingWriter();
-  writer.write(findings, currentRootDir, siteId);
+  writer.write(findings, siteFolder, siteId);
 
   res.json({ ok: true, scanId: result.id });
 }));
@@ -187,6 +204,14 @@ app.post('/api/connections/test', requireAuth, withError(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// Check if folder is an Obsidian vault
+app.post('/api/check-vault', (req, res) => {
+  const folder = req.body.folder || '';
+  const obsidianPath = path.join(folder, '.obsidian');
+  const isVault = fs.existsSync(obsidianPath) && fs.statSync(obsidianPath).isDirectory();
+  res.json({ isVault });
+});
+
 // Serve React build assets
 const rendererPath = path.join(__dirname, 'renderer');
 app.use(express.static(rendererPath));
@@ -194,12 +219,11 @@ app.use((_req, res) => {
   res.sendFile(path.join(rendererPath, 'index.html'));
 });
 
-const PORT = parseInt(process.env.PORT || '0', 10);
+const PORT = parseInt(process.env.PORT || '3456', 10);
 const server = createServer(app);
 server.listen(PORT, () => {
   const addr = server.address();
   const port = typeof addr === 'string' ? addr : addr?.port || 3456;
   console.log(`WP_SECURITY_HUB_PORT=${port}`);
-  console.log(`\n  WP Security Hub Dashboard running at:`);
-  console.log(`  \x1b[36mhttp://localhost:${port}\x1b[0m\n`);
+  console.log(`\n  WP Security Hub Dashboard running at http://localhost:${port}\n`);
 });

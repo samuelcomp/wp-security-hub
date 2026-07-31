@@ -1,20 +1,504 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WP Security Hub</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e1e4e8; }
-    input, select, textarea, button { font-family: inherit; }
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: #161b22; }
-    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
-  </style>
+<meta charset="UTF-8">
+<title>WP Security Hub</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f1117;color:#e1e4e8}
+:root{--bg:#0f1117;--s:#161b22;--s2:#1c2333;--b:#30363d;--t:#e1e4e8;--tm:#8b949e;--p:#58a6ff;--g:#3fb950;--w:#d29922;--r:#f85149}
+input,select,textarea,button{font-family:inherit;font-size:13px}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--s)}::-webkit-scrollbar-thumb{background:var(--b);border-radius:3px}
+#unlock{display:flex;align-items:center;justify-content:center;height:100vh}
+#unlock .card{width:400px;text-align:center}
+#app{display:none;height:100vh}
+.card{background:var(--s);border:1px solid var(--b);border-radius:8px;padding:20px}
+.btn{padding:6px 16px;border:none;border-radius:6px;cursor:pointer;color:#fff;font-weight:500}
+.btn-p{background:var(--p)}.btn-p:hover{background:#79c0ff}
+.btn-g{background:var(--g)}.btn-g:hover{background:#4cb96d}
+.btn-r{background:var(--r)}.btn-r:hover{background:#ff6b6b}
+.btn-o{background:transparent;color:var(--tm)}
+.inp{background:var(--s);border:1px solid var(--b);border-radius:6px;padding:8px 12px;color:var(--t);outline:none;width:100%}
+.lbl{font-size:12px;color:var(--tm);margin-bottom:4px;display:block}
+.badge{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:500}
+.sidebar{width:220px;background:var(--s);border-right:1px solid var(--b);display:flex;flex-direction:column}
+.sidebar h3{padding:20px 16px;border-bottom:1px solid var(--b);font-size:15px;color:var(--p)}
+.nav-btn{display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;border:none;color:var(--tm);cursor:pointer;text-align:left;background:transparent}
+.nav-btn.active{background:var(--s2);color:var(--p)}
+.main{flex:1;overflow:auto;padding:24px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.flex{display:flex}.flex-col{flex-direction:column}.gap8{gap:8px}.gap12{gap:12px}.gap16{gap:16px}
+.jcsb{justify-content:space-between}.aic{align-items:center}
+.mb12{margin-bottom:12px}.mb16{margin-bottom:16px}.mb20{margin-bottom:20px}.mb24{margin-bottom:24px}
+.mt4{margin-top:4px}.mt12{margin-top:12px}
+.fs11{font-size:11px}.fs12{font-size:12px}.fs13{font-size:13px}.fs14{font-size:14px}.fs15{font-size:15px}.fs20{font-size:20px}
+.fw600{font-weight:600}.fw700{font-weight:700}
+.mono{font-family:monospace}
+.w100{width:100%}.h100{height:100%}
+.mx800{max-width:800px}.mx1200{max-width:1200px}
+.sev-crit{color:var(--r);background:rgba(248,81,73,.12)}.sev-high{color:var(--w);background:rgba(210,153,34,.12)}.sev-med{color:var(--p);background:rgba(88,166,255,.12)}.sev-low{color:var(--tm);background:rgba(139,148,158,.12)}
+.findings-list{max-height:500px;overflow-y:auto}
+.findings-list>div{padding:10px 0;border-bottom:1px solid var(--b)}
+.hidden{display:none!important}.pointer{cursor:pointer}
+</style>
 </head>
 <body>
-  <div id="root"></div>
-  <script type="module" src="./main.tsx"></script>
+
+<div id="unlock"></div>
+<div id="app">
+  <div class="sidebar" id="sidebar"></div>
+  <div class="main" id="main"></div>
+</div>
+
+<script>
+var API='http://localhost:3456/api';
+var hub='';
+var state = { unlocked: false, page: 'dashboard', sites: [], selectedSite: null, selectedScan: null };
+var content = {};
+var loading = {};
+
+function api(p,o) {
+  return fetch(API+p, {
+    method: o && o.method || 'GET',
+    headers: {'Content-Type':'application/json'},
+    body: o && o.body ? JSON.stringify(o.body) : undefined
+  }).then(function(r){ return r.json() });
+}
+
+function redirect(p) {
+  state.page = p;
+  if (p !== 'site-detail') state.selectedSite = null;
+  render();
+}
+
+function bind(el, fn) {
+  return function(e) { fn(e); render(); };
+}
+
+function renderUnlock() {
+  document.getElementById('unlock').innerHTML = [
+    '<div class="card">',
+    '<div style="font-size:32px;color:var(--p);margin-bottom:16px">&#x1f6e1;</div>',
+    '<h1 style="font-size:20px;font-weight:600;margin-bottom:8px">WP Security Hub</h1>',
+    '<p style="font-size:13px;color:var(--tm);margin-bottom:24px">Enter your master passphrase to unlock</p>',
+    '<div style="text-align:left;display:flex;flex-direction:column;gap:12px">',
+    '<div><label class="lbl">Master Passphrase</label><input class="inp" type="password" id="upw" placeholder="Enter passphrase" autofocus></div>',
+    '<div id="ulerr" style="font-size:12px;color:var(--r);display:none"></div>',
+    '<button class="btn btn-p" onclick="doUnlock()">Unlock</button>',
+    '</div></div>'
+  ].join('');
+}
+
+window.browseFolder = function() {
+  if (window.electronAPI && window.electronAPI.selectFolder) {
+    window.electronAPI.selectFolder().then(function(folder) {
+      if (folder) {
+        document.getElementById('udir').value = folder;
+        checkVault(folder);
+      }
+    });
+  } else {
+    // Fallback: create a hidden file input for folder selection
+    var inp = document.createElement('input');
+    inp.type = 'file';
+    inp.style.display = 'none';
+    inp.setAttribute('webkitdirectory', '');
+    inp.setAttribute('directory', '');
+    inp.onchange = function() {
+      if (this.files && this.files.length) {
+        var p = this.files[0].webkitRelativePath || this.files[0].name;
+        var dir = p.split('/')[0];
+        document.getElementById('udir').value = dir;
+        checkVault(dir);
+      }
+    };
+    document.body.appendChild(inp);
+    inp.click();
+    document.body.removeChild(inp);
+  }
+};
+
+function checkVault(folder) {
+  var vs = document.getElementById('vault-status');
+  api('/check-vault', {method:'POST', body:{folder:folder}}).then(function(r) {
+    if (r.isVault) {
+      vs.style.display = 'block';
+      vs.style.color = 'var(--g)';
+      vs.textContent = 'Obsidian vault detected! Data will be stored inside the vault.';
+    } else {
+      vs.style.display = 'block';
+      vs.style.color = 'var(--w)';
+      vs.textContent = 'Not an Obsidian vault. A wp-security-hub folder will be created here.';
+    }
+  }).catch(function() {
+    vs.style.display = 'block';
+    vs.style.color = 'var(--tm)';
+    vs.textContent = 'Folder selected.';
+  });
+};
+
+window.doUnlock = function() {
+  var pw = document.getElementById('upw').value;
+  var btn = document.querySelector('#unlock .btn-p');
+  btn.disabled = true; btn.textContent = 'Unlocking...';
+  api('/unlock', {method:'POST', body:{password:pw}}).then(function(r) {
+    if (r.ok) {
+      hub = r.rootDir;
+      state.unlocked = true;
+      document.getElementById('unlock').style.display = 'none';
+      document.getElementById('app').style.display = 'flex';
+      renderSidebar();
+      refreshSites();
+    } else {
+      document.getElementById('ulerr').style.display = 'block';
+      document.getElementById('ulerr').textContent = r.error || 'Wrong passphrase';
+      btn.disabled = false; btn.textContent = 'Unlock';
+    }
+  });
+};
+
+document.getElementById('upw') && document.getElementById('upw').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doUnlock();
+});
+
+function renderSidebar() {
+  document.getElementById('sidebar').innerHTML = [
+    '<h3>WP Security Hub</h3>',
+    '<nav style="flex:1;padding:8px 0">',
+    '<button class="nav-btn'+(state.page==='dashboard'?' active':'')+'" onclick="redirect(\'dashboard\')">Dashboard</button>',
+    '<button class="nav-btn'+(state.page==='sites'?' active':'')+'" onclick="redirect(\'sites\')">Sites</button>',
+    '<button class="nav-btn'+(state.page==='settings'?' active':'')+'" onclick="redirect(\'settings\')">Settings</button>',
+    '</nav>',
+    '<div style="padding:12px;border-top:1px solid var(--b)">',
+    '<button class="btn btn-o w100" onclick="doLock()">Lock</button>',
+    '</div>'
+  ].join('');
+}
+
+function doLock() {
+  state.unlocked = false;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('unlock').style.display = 'flex';
+  renderUnlock();
+}
+
+function refreshSites() {
+  api('/sites').then(function(s) {
+    state.sites = s || [];
+    render();
+  });
+}
+
+function render() {
+  renderSidebar();
+  var main = document.getElementById('main');
+  if (state.page === 'dashboard') main.innerHTML = renderDashboard();
+  else if (state.page === 'sites') main.innerHTML = renderSitesPage();
+  else if (state.page === 'site-detail' && state.selectedSite) renderSiteDetail(main);
+  else if (state.page === 'settings') renderSettingsPage(main);
+}
+
+function renderDashboard() {
+  var s = state.sites;
+  if (!s.length) return '<div class="mx1200"><div class="card" style="text-align:center;padding:40px"><p style="color:var(--tm)">No sites registered. Go to Sites tab to add your first website.</p></div></div>';
+  var cards = s.map(function(site) {
+    var c = site.healthScore >= 80 ? 'var(--g)' : site.healthScore >= 50 ? 'var(--w)' : 'var(--r)';
+    var label = site.healthScore >= 80 ? 'Good' : site.healthScore >= 50 ? 'Fair' : 'Critical';
+    return '<div class="card">'+
+      '<div class="flex jcsb mb12"><div><h3 class="fs15 fw600 pointer" style="color:var(--p)" onclick="viewSite(\''+site.id+'\')">'+site.domain+'</h3><span class="fs11" style="color:var(--tm)">'+site.connection+'</span></div><span class="badge" style="color:'+c+';background:'+c.replace(')','.12)')+'">'+label+'</span></div>'+
+      '<div class="mb12"><div class="fw700" style="font-size:28px;color:'+c+'">'+site.healthScore+'</div><div class="fs11" style="color:var(--tm)">Health Score</div></div>'+
+      '<button class="btn btn-p" onclick="scanSite(\''+site.id+'\')">Scan</button>'+
+      '</div>';
+  }).join('');
+  return '<div class="mx1200"><h2 class="fs20 fw600 mb20">Dashboard</h2><div class="grid2">'+cards+'</div></div>';
+}
+
+function viewSite(id) {
+  state.selectedSite = id;
+  state.page = 'site-detail';
+  render();
+  loadSiteDetail();
+}
+
+function scanSite(id) {
+  state.selectedSite = id;
+  state.page = 'site-detail';
+  render();
+  var main = document.getElementById('main');
+  main.querySelector('.scansection').innerHTML = '<div class="card"><p style="color:var(--w)">Scanning...</p></div>';
+  api('/scans/'+id, {method:'POST'}).then(function(r) {
+    if (r.ok) loadSiteDetail();
+    else alert(r.error || 'Scan failed');
+  });
+}
+
+function loadSiteDetail() {
+  var id = state.selectedSite;
+  api('/sites/'+id).then(function(site) {
+    api('/scans/'+id).then(function(scans) {
+      content.site = site;
+      content.scans = scans || [];
+      if (content.scans.length) {
+        state.selectedScan = content.scans[0].id;
+        api('/findings/'+content.scans[0].id).then(function(f) {
+          content.findings = f || [];
+          renderSiteFindings();
+        });
+      } else {
+        content.findings = [];
+        renderSiteFindings();
+      }
+    });
+  });
+}
+
+function renderSiteDetail(main) {
+  main.innerHTML = '<div class="mx1200">'+
+    '<button class="btn-o pointer mb16" onclick="redirect(\'sites\')">\u2190 Back to Sites</button>'+
+    '<div class="flex jcsb mb24"><div><h2 class="fs20 fw600" id="sdetail-name">Loading...</h2><p class="fs13" style="color:var(--tm)" id="sdetail-score">---</p></div>'+
+    '<div class="flex gap8"><button class="btn btn-p" onclick="scanSite(\''+state.selectedSite+'\')">Run Scan</button><button class="btn btn-g" onclick="fixAll()" id="fixall-btn">Fix All (0)</button></div>'+
+    '</div>'+
+    '<div class="scansection grid2" style="grid-template-columns:1fr 2fr">'+
+    '<div class="card"><h3 class="fs14 fw600 mb12">Scan History</h3><div id="scanlist"><p class="fs12" style="color:var(--tm)">Loading scans...</p></div></div>'+
+    '<div class="card"><h3 class="fs14 fw600 mb12">Findings (<span id="fcount">0</span>)</h3><div id="findingslist"><p class="fs12" style="color:var(--tm)">Select a scan</p></div></div>'+
+    '</div></div>';
+}
+
+function renderSiteFindings() {
+  var site = content.site;
+  var scans = content.scans;
+  var findings = content.findings;
+  if (!site) return;
+  document.getElementById('sdetail-name').textContent = site.domain;
+  document.getElementById('sdetail-score').textContent = 'Health Score: '+site.healthScore+'/100  \u00b7  '+site.connection;
+
+  var fcount = findings.filter(function(f){return f.status==='new'}).length;
+  document.getElementById('fcount').textContent = findings.length;
+  var fb = document.getElementById('fixall-btn');
+  fb.textContent = 'Fix All ('+fcount+')';
+  fb.disabled = fcount === 0;
+
+  var scanHtml = scans.length ? scans.slice(0,10).map(function(s) {
+    var active = state.selectedScan === s.id ? 'style="background:var(--s2)"' : '';
+    var sc = s.status==='completed' ? 'var(--g)' : s.status==='running' ? 'var(--w)' : 'var(--r)';
+    return '<div class="pointer" style="padding:8px 10px;border-radius:6px;font-size:12px" '+active+' onclick="pickScan(\''+s.id+'\')">'+
+      '<div class="flex jcsb aic"><span>'+new Date(s.startedAt).toLocaleDateString()+'</span><span class="badge" style="color:'+sc+';background:'+sc.replace(')','.12)')+'">'+s.status+'</span></div>'+
+      '<div style="color:var(--tm);margin-top:2px">'+new Date(s.startedAt).toLocaleTimeString()+'</div></div>';
+  }).join('') : '<p class="fs12" style="color:var(--tm)">No scans yet</p>';
+  document.getElementById('scanlist').innerHTML = scanHtml;
+
+  if (!findings.length) {
+    document.getElementById('findingslist').innerHTML = '<p class="fs12" style="color:var(--tm)">No findings in this scan</p>';
+    return;
+  }
+
+  var sevClass = {critical:'sev-crit',high:'sev-high',medium:'sev-med',low:'sev-low'};
+  var fhtml = findings.map(function(f) {
+    var fc = sevClass[f.severity] || '';
+    var sc = f.status==='fixed' ? 'var(--g)' : f.status==='approved' ? 'var(--w)' : 'var(--tm)';
+    return '<div>'+
+      '<div class="flex jcsb" style="margin-bottom:4px"><div class="flex aic gap8"><span class="badge '+fc+'">'+f.severity+'</span><span class="fs13 fw500">'+f.title+'</span></div><span class="badge" style="color:'+sc+';background:'+sc.replace(')','.12)')+'">'+f.status+'</span></div>'+
+      '<p class="fs12 mt4" style="color:var(--tm)">'+f.description+'</p>'+
+      (f.sourceFile ? '<p class="fs11 mono mt4" style="color:var(--tm)">'+f.sourceFile+'</p>' : '')+
+      (f.recommendation ? '<p class="fs12 mt4" style="color:var(--w)">\u2192 '+f.recommendation+'</p>' : '')+'</div>';
+  }).join('');
+  document.getElementById('findingslist').innerHTML = '<div class="findings-list">'+fhtml+'</div>';
+}
+
+function pickScan(id) {
+  state.selectedScan = id;
+  api('/findings/'+id).then(function(f) {
+    content.findings = f || [];
+    renderSiteFindings();
+  });
+}
+
+function fixAll() {
+  var fb = document.getElementById('fixall-btn');
+  fb.disabled = true; fb.textContent = 'Fixing...';
+  api('/fixes/'+state.selectedSite+'/'+state.selectedScan, {method:'POST'}).then(function(r) {
+    if (r.ok) {
+      api('/findings/'+state.selectedScan).then(function(f) { content.findings = f; renderSiteFindings(); });
+      alert('Fixed: '+r.fixed+', Failed: '+r.failed);
+    } else {
+      alert(r.error || 'Fix failed');
+      fb.disabled = false; fb.textContent = 'Fix All';
+    }
+  });
+}
+
+function renderSitesPage() {
+  var rows = state.sites.map(function(s) {
+    return '<div class="card flex jcsb aic">'+
+      '<div><div class="fs15 fw600 pointer" style="color:var(--p)" onclick="viewSite(\''+s.id+'\')">'+s.domain+'</div><div class="fs12 mt4" style="color:var(--tm)">'+s.connection+'  \u00b7  Score: '+s.healthScore+'</div></div>'+
+      '<div class="flex gap8 aic"><span class="badge" style="color:var(--p);background:rgba(88,166,255,.12)">'+s.connection+'</span><button class="btn-o" style="color:var(--r);font-size:18px" onclick="deleteSite(\''+s.id+'\')">\u00d7</button></div></div>';
+  }).join('');
+
+  var addForm = content.showAdd ? [
+    '<div class="card mb20">',
+    '<h3 class="fs15 fw600 mb16">Add New Site</h3>',
+    '<div class="grid2 mb16">',
+    '<div><label class="lbl">Domain</label><input class="inp" id="af-domain" placeholder="example.com"></div>',
+    '<div><label class="lbl">Connection Type</label><select class="inp" id="af-type" onchange="updateConnFields()"><option value="ssh">SSH</option><option value="cpanel">cPanel API</option><option value="wp-admin">WP Admin</option></select></div>',
+    '<div id="af-extra-0"><label class="lbl">Host</label><input class="inp" id="af-host"></div>',
+    '<div id="af-extra-1"><label class="lbl">Port</label><input class="inp" id="af-port" placeholder="22"></div>',
+    '<div id="af-extra-2"><label class="lbl">Username</label><input class="inp" id="af-username"></div>',
+    '<div id="af-extra-3"><label class="lbl" id="af-pwd-label">Password</label><input class="inp" type="password" id="af-password"></div>',
+    '</div>',
+    '<div style="border-top:1px solid var(--b);padding-top:16px;margin-bottom:16px">',
+    '<label class="lbl">Site Data Folder (reports and findings saved here)</label>',
+    '<div class="flex gap8"><input class="inp" type="text" id="af-folder" placeholder="Select a folder for this site..." style="flex:1" readonly>',
+    '<button class="btn btn-p" onclick="browseSiteFolder()" style="flex-shrink:0">Browse</button></div>',
+    '<div id="af-vstatus" style="font-size:11px;margin-top:4px"></div>',
+    '</div>',
+    '<div class="flex gap8">',
+    '<button class="btn btn-p" onclick="doAddSite()">Save Site</button>',
+    '<button class="btn-o" onclick="content.showAdd=false;render()">Cancel</button>',
+    '</div>',
+    '</div>'
+  ].join('') : '';
+
+  return '<div class="mx1200">'+
+    '<div class="flex jcsb aic mb20"><h2 class="fs20 fw600">Sites</h2><button class="btn btn-p" onclick="content.showAdd=!content.showAdd;render()">'+(content.showAdd?'Close':'+ Add Site')+'</button></div>'+
+    addForm+
+    (state.sites.length ? '<div class="flex flex-col gap12">'+rows+'</div>' : '<div class="card" style="text-align:center;padding:40px"><p style="color:var(--tm)">No sites registered yet</p></div>')+
+    '</div>';
+}
+
+function doAddSite() {
+  var type = document.getElementById('af-type').value;
+  var creds = {};
+  if (type === 'ssh' || type === 'cpanel') {
+    creds.host = document.getElementById('af-host').value;
+    creds.port = parseInt(document.getElementById('af-port').value || (type==='cpanel'?'2083':'22'));
+    creds.username = document.getElementById('af-username').value;
+    if (type === 'ssh') creds.password = document.getElementById('af-password').value;
+    else creds.apiToken = document.getElementById('af-password').value;
+  } else {
+    creds.url = document.getElementById('af-host').value;
+    creds.username = document.getElementById('af-username').value;
+    creds.password = document.getElementById('af-password').value;
+  }
+  var domain = document.getElementById('af-domain').value;
+  var folder = document.getElementById('af-folder').value;
+  api('/sites', {method:'POST', body:{domain:domain, connection:type, credentials:creds, folder:folder}}).then(function() {
+    content.showAdd = false;
+    refreshSites();
+  });
+}
+
+window.browseSiteFolder = function() {
+  if (window.electronAPI && window.electronAPI.selectFolder) {
+    window.electronAPI.selectFolder().then(function(folder) {
+      if (folder) {
+        document.getElementById('af-folder').value = folder;
+        checkSiteVault(folder);
+      }
+    });
+  } else {
+    var inp = document.createElement('input');
+    inp.type = 'file';
+    inp.style.display = 'none';
+    inp.setAttribute('webkitdirectory', '');
+    inp.setAttribute('directory', '');
+    inp.onchange = function() {
+      if (this.files && this.files.length) {
+        var p = this.files[0].webkitRelativePath || this.files[0].name;
+        var dir = p.split('/')[0];
+        document.getElementById('af-folder').value = dir;
+        checkSiteVault(dir);
+      }
+    };
+    document.body.appendChild(inp);
+    inp.click();
+    document.body.removeChild(inp);
+  }
+};
+
+function checkSiteVault(folder) {
+  api('/check-vault', {method:'POST', body:{folder:folder}}).then(function(r) {
+    var vs = document.getElementById('af-vstatus');
+    if (r.isVault) {
+      vs.style.color = 'var(--g)';
+      vs.textContent = '\u2705 Obsidian vault — site data will appear in your vault';
+    } else {
+      vs.style.color = 'var(--tm)';
+      vs.textContent = '\u2139 Site data will be saved in: ' + folder;
+    }
+  }).catch(function() {});
+}
+
+function updateConnFields() {
+  var type = document.getElementById('af-type').value;
+  var labels = {'ssh':['Host','Port','Username','Password'], 'cpanel':['Host','Port','Username','API Token'], 'wp-admin':['URL','Username','Password','']};
+  var places = {'ssh':['','22','',''], 'cpanel':['','2083','',''], 'wp-admin':['https://','','','']};
+  var l = labels[type];
+  var p2 = places[type];
+  for (var i=0; i<4; i++) {
+    var el = document.getElementById('af-extra-'+i);
+    if (!el) continue;
+    if (i < l.length && l[i]) {
+      el.style.display = '';
+      el.querySelector('.lbl').textContent = l[i];
+      el.querySelector('input').placeholder = p2[i] || '';
+      if (type==='wp-admin' && i===3) el.style.display = 'none';
+    } else {
+      el.style.display = 'none';
+    }
+  }
+  document.getElementById('af-pwd-label').textContent = type==='cpanel' ? 'API Token' : 'Password';
+  render();
+}
+
+function deleteSite(id) {
+  if (!confirm('Delete this site?')) return;
+  api('/sites/'+id, {method:'DELETE'}).then(refreshSites);
+}
+
+function renderSettingsPage(main) {
+  api('/settings').then(function(s) {
+    var keys = s.apiKeys || {};
+    main.innerHTML = '<div class="mx800">'+
+    '<h2 class="fs20 fw600 mb20">Settings</h2>'+
+
+    '<div class="card mb16"><h3 class="fs14 fw600 mb16">API Keys</h3>'+
+    '<div class="flex flex-col gap12">'+
+    '<div><label class="lbl">OpenRouter API Key</label><input class="inp" type="password" id="s-or-key" value="'+(keys.openrouter?keys.openrouter.key||'':'')+'"></div>'+
+    '<div><label class="lbl">OpenRouter Model</label><input class="inp" id="s-or-model" value="'+(keys.openrouter?keys.openrouter.model||'deepseek/deepseek-chat':'deepseek/deepseek-chat')+'"></div>'+
+    '<div><label class="lbl">VirusTotal API Key</label><input class="inp" type="password" id="s-vt-key" value="'+(keys.virustotal?keys.virustotal.key||'':'')+'"></div>'+
+    '<div><label class="lbl">WPScan API Key</label><input class="inp" type="password" id="s-wp-key" value="'+(keys.wpscan?keys.wpscan.key||'':'')+'"></div>'+
+    '</div></div>'+
+
+    '<div class="card mb16"><h3 class="fs14 fw600 mb16">Scan Configuration</h3>'+
+    '<div class="grid2 gap12">'+
+    '<div><label class="lbl">Max Parallel Scans</label><input class="inp" type="number" id="s-max" value="'+s.maxParallelScans+'"></div>'+
+    '<div><label class="lbl">API Rate Limit (req/s)</label><input class="inp" type="number" id="s-rate" value="'+s.apiRateLimit+'"></div>'+
+    '</div>'+
+    '<div class="flex gap8 aic mt12"><input type="checkbox" id="s-ai"'+(s.aiEnabled?' checked':'')+'><label for="s-ai" class="fs13">Enable AI Analysis (OpenRouter)</label></div>'+
+    '</div>'+
+
+    '<button class="btn btn-p" onclick="doSaveSettings()">Save Settings</button>'+
+    '</div>';
+  });
+}
+
+function doSaveSettings() {
+  var settings = {
+    apiKeys: {
+      openrouter: {key: document.getElementById('s-or-key').value, model: document.getElementById('s-or-model').value},
+      virustotal: {key: document.getElementById('s-vt-key').value},
+      wpscan: {key: document.getElementById('s-wp-key').value}
+    },
+    maxParallelScans: parseInt(document.getElementById('s-max').value)||10,
+    apiRateLimit: parseInt(document.getElementById('s-rate').value)||4,
+    aiEnabled: document.getElementById('s-ai').checked,
+    aiModel: document.getElementById('s-or-model').value,
+    defaultOutputDir: ''
+  };
+  api('/settings', {method:'PUT', body:settings}).then(function() { alert('Settings saved!'); });
+}
+
+renderUnlock();
+</script>
 </body>
 </html>
