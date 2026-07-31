@@ -30,7 +30,7 @@ input,select,textarea,button{font-family:inherit;font-size:13px}
 .flex{display:flex}.flex-col{flex-direction:column}.gap8{gap:8px}.gap12{gap:12px}.gap16{gap:16px}
 .jcsb{justify-content:space-between}.aic{align-items:center}
 .mb12{margin-bottom:12px}.mb16{margin-bottom:16px}.mb20{margin-bottom:20px}.mb24{margin-bottom:24px}
-.mt4{margin-top:4px}.mt12{margin-top:12px}
+.mt4{margin-top:4px}.mt12{margin-top:12px}.mt16{margin-top:16px}
 .fs11{font-size:11px}.fs12{font-size:12px}.fs13{font-size:13px}.fs14{font-size:14px}.fs15{font-size:15px}.fs20{font-size:20px}
 .fw600{font-weight:600}.fw700{font-weight:700}
 .mono{font-family:monospace}
@@ -261,7 +261,11 @@ function renderSiteDetail(main) {
     '<div class="scansection grid2" style="grid-template-columns:1fr 2fr">'+
     '<div class="card"><h3 class="fs14 fw600 mb12">Scan History</h3><div id="scanlist"><p class="fs12" style="color:var(--tm)">Loading scans...</p></div></div>'+
     '<div class="card"><h3 class="fs14 fw600 mb12">Findings (<span id="fcount">0</span>)</h3><div id="findingslist"><p class="fs12" style="color:var(--tm)">Select a scan</p></div></div>'+
-    '</div></div>';
+    '</div>'+
+    '<div id="external-scanners" class="card mt16"><h3 class="fs14 fw600 mb12">External Scanners (click to open)</h3>'+
+    '<div class="grid2 gap8"><div id="scanner-links">Loading...</div></div>'+
+    '</div>'+
+    '</div>';
 }
 
 function renderSiteFindings() {
@@ -271,6 +275,18 @@ function renderSiteFindings() {
   if (!site) return;
   document.getElementById('sdetail-name').textContent = site.domain;
   document.getElementById('sdetail-score').textContent = 'Health Score: '+site.healthScore+'/100  \u00b7  '+site.connection;
+
+  var domain = site.domain.replace(/^https?:\/\//, '');
+
+  document.getElementById('scanner-links').innerHTML = [
+    ['VirusTotal','https://www.virustotal.com/gui/domain/'+domain, 'Check domain reputation, malware, blacklists'],
+    ['Sucuri SiteCheck','https://sitecheck.sucuri.net/results/'+domain, 'Remote malware & blacklist scan'],
+    ['WPScan','https://wpscan.com/wordpress/'+domain+'/', 'WordPress vulnerability database'],
+    ['HackerTarget','https://hackertarget.com/wordpress-security-scan/', 'WordPress security headers & config'],
+    ['WPSec','https://wpsec.com/', 'WordPress security assessment'],
+  ].map(function(s) {
+    return '<a href="'+s[1]+'" target="_blank" rel="noopener" style="display:block;padding:10px 12px;background:var(--s2);border-radius:6px;text-decoration:none;color:var(--t);font-size:12px;border:1px solid var(--b);transition:background 0.2s" onmouseover="this.style.background=\'#252d3a\'" onmouseout="this.style.background=\'var(--s2)\'"><span style="color:var(--p);font-weight:600">'+s[0]+'</span><br><span style="color:var(--tm);font-size:11px">'+s[2]+'</span></a>';
+  }).join('');
 
   var fcount = findings.filter(function(f){return f.status==='new'}).length;
   document.getElementById('fcount').textContent = findings.length;
@@ -458,27 +474,60 @@ function deleteSite(id) {
 function renderSettingsPage(main) {
   api('/settings').then(function(s) {
     var keys = s.apiKeys || {};
+    var orKey = (keys.openrouter && keys.openrouter.key) || '';
+    var orModel = (keys.openrouter && keys.openrouter.model) || 'deepseek/deepseek-chat';
+    var vtKey = (keys.virustotal && keys.virustotal.key) || '';
+    var wpKey = (keys.wpscan && keys.wpscan.key) || '';
+    var hasAI = orKey && s.aiEnabled;
+
+    var aiModels = [
+      {v:'deepseek/deepseek-chat',l:'DeepSeek V3 (Fast & Cheap)'},
+      {v:'deepseek/deepseek-reasoner',l:'DeepSeek R1 (Reasoning)'},
+      {v:'openai/gpt-4o',l:'GPT-4o'},
+      {v:'openai/gpt-4o-mini',l:'GPT-4o Mini'},
+      {v:'anthropic/claude-3.5-sonnet',l:'Claude 3.5 Sonnet'},
+      {v:'anthropic/claude-3-opus',l:'Claude 3 Opus'},
+      {v:'google/gemini-2.0-flash',l:'Gemini 2.0 Flash'},
+      {v:'meta-llama/llama-3.1-405b',l:'Llama 3.1 405B'},
+    ];
+
+    var modelOpts = aiModels.map(function(m) { return '<option value="'+m.v+'"'+(orModel===m.v?' selected':'')+'>'+m.l+'</option>'; }).join('');
+
     main.innerHTML = '<div class="mx800">'+
     '<h2 class="fs20 fw600 mb20">Settings</h2>'+
 
-    '<div class="card mb16"><h3 class="fs14 fw600 mb16">API Keys</h3>'+
+    '<div class="card mb16">'+
+    '<h3 class="fs14 fw600 mb16" style="display:flex;align-items:center;gap:8px">\u{1f916} AI Analysis</h3>'+
+    '<p class="fs12 mb16" style="color:var(--tm)">AI analyzes suspicious files to classify malware. Uses <a href="https://openrouter.ai" target="_blank" style="color:var(--p)">OpenRouter</a> — one API key, access to all models.</p>'+
     '<div class="flex flex-col gap12">'+
-    '<div><label class="lbl">OpenRouter API Key</label><input class="inp" type="password" id="s-or-key" value="'+(keys.openrouter?keys.openrouter.key||'':'')+'"></div>'+
-    '<div><label class="lbl">OpenRouter Model</label><input class="inp" id="s-or-model" value="'+(keys.openrouter?keys.openrouter.model||'deepseek/deepseek-chat':'deepseek/deepseek-chat')+'"></div>'+
-    '<div><label class="lbl">VirusTotal API Key</label><input class="inp" type="password" id="s-vt-key" value="'+(keys.virustotal?keys.virustotal.key||'':'')+'"></div>'+
-    '<div><label class="lbl">WPScan API Key</label><input class="inp" type="password" id="s-wp-key" value="'+(keys.wpscan?keys.wpscan.key||'':'')+'"></div>'+
+    '<div><label class="lbl">OpenRouter API Key <span style="color:var(--tm)">(get free credits at openrouter.ai)</span></label><input class="inp" type="password" id="s-or-key" value="'+orKey+'" placeholder="sk-or-v1-..." style="font-family:monospace"></div>'+
+    '<div><label class="lbl">AI Model</label><select class="inp" id="s-or-model">'+modelOpts+'</select></div>'+
+    '</div>'+
+    '<div class="flex gap8 aic mt12">'+
+    '<input type="checkbox" id="s-ai"'+(s.aiEnabled?' checked':'')+' onchange="document.getElementById(\'s-or-key\').style.opacity=this.checked?\'1\':\'0.4\'">'+
+    '<label for="s-ai" class="fs13" style="color:'+(hasAI?'var(--g)':'var(--tm)')+'">'+(hasAI?'\u2705 AI Analysis enabled':'Enable AI Analysis')+'</label>'+
     '</div></div>'+
 
-    '<div class="card mb16"><h3 class="fs14 fw600 mb16">Scan Configuration</h3>'+
-    '<div class="grid2 gap12">'+
-    '<div><label class="lbl">Max Parallel Scans</label><input class="inp" type="number" id="s-max" value="'+s.maxParallelScans+'"></div>'+
-    '<div><label class="lbl">API Rate Limit (req/s)</label><input class="inp" type="number" id="s-rate" value="'+s.apiRateLimit+'"></div>'+
-    '</div>'+
-    '<div class="flex gap8 aic mt12"><input type="checkbox" id="s-ai"'+(s.aiEnabled?' checked':'')+'><label for="s-ai" class="fs13">Enable AI Analysis (OpenRouter)</label></div>'+
-    '</div>'+
+    '<div class="card mb16">'+
+    '<h3 class="fs14 fw600 mb12" style="cursor:pointer;display:flex;align-items:center;gap:8px" onclick="var e=document.getElementById(\'ext-apis\');e.style.display=e.style.display===\'none\'?\'\':\'none\'">\u{1f310} External APIs '+(vtKey||wpKey?'(\u2705 configured)':'(optional)')+' <span style="margin-left:auto;font-size:11px;color:var(--tm)">\u25bc</span></h3>'+
+    '<div id="ext-apis" style="display:none;padding-top:8px">'+
+    '<p class="fs12 mb12" style="color:var(--tm)">API keys enable automated vulnerability checks. Manual scanner links available on each site page.</p>'+
+    '<div class="flex flex-col gap12">'+
+    '<div><label class="lbl">VirusTotal API Key</label><input class="inp" type="password" id="s-vt-key" value="'+vtKey+'" placeholder="Free at virustotal.com"></div>'+
+    '<div><label class="lbl">WPScan API Key</label><input class="inp" type="password" id="s-wp-key" value="'+wpKey+'" placeholder="Free at wpscan.com"></div>'+
+    '</div></div></div>'+
 
+    '<div class="card mb16">'+
+    '<h3 class="fs14 fw600 mb16" style="display:flex;align-items:center;gap:8px">\u2699 Scan Configuration</h3>'+
+    '<div class="grid2 gap12">'+
+    '<div><label class="lbl">Max Parallel Scans</label><input class="inp" type="number" id="s-max" value="'+s.maxParallelScans+'" min="1" max="20"></div>'+
+    '<div><label class="lbl">API Rate Limit (req/s)</label><input class="inp" type="number" id="s-rate" value="'+s.apiRateLimit+'" min="1" max="20"></div>'+
+    '</div></div>'+
+
+    '<div style="display:flex;gap:12px;align-items:center">'+
     '<button class="btn btn-p" onclick="doSaveSettings()">Save Settings</button>'+
-    '</div>';
+    '<span id="settings-saved" style="font-size:12px;color:var(--g);display:none">\u2705 Saved!</span>'+
+    '</div></div>';
   });
 }
 
@@ -495,7 +544,11 @@ function doSaveSettings() {
     aiModel: document.getElementById('s-or-model').value,
     defaultOutputDir: ''
   };
-  api('/settings', {method:'PUT', body:settings}).then(function() { alert('Settings saved!'); });
+  api('/settings', {method:'PUT', body:settings}).then(function() {
+    var el = document.getElementById('settings-saved');
+    el.style.display = 'inline-block';
+    setTimeout(function(){ el.style.display = 'none'; }, 3000);
+  });
 }
 
 renderUnlock();
