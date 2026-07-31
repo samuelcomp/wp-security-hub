@@ -476,13 +476,13 @@ function renderSettingsPage(main) {
     var keys = s.apiKeys || {};
     var orKey = (keys.openrouter && keys.openrouter.key) || '';
     var orModel = (keys.openrouter && keys.openrouter.model) || 'deepseek/deepseek-chat';
-    var vtKey = (keys.virustotal && keys.virustotal.key) || '';
-    var wpKey = (keys.wpscan && keys.wpscan.key) || '';
     var hasAI = orKey && s.aiEnabled;
 
     var aiModels = [
       {v:'deepseek/deepseek-chat',l:'DeepSeek V3 (Fast & Cheap)'},
       {v:'deepseek/deepseek-reasoner',l:'DeepSeek R1 (Reasoning)'},
+      {v:'deepseek/deepseek-v4-pro',l:'DeepSeek V4 Pro'},
+      {v:'deepseek/deepseek-flash',l:'DeepSeek Flash'},
       {v:'openai/gpt-4o',l:'GPT-4o'},
       {v:'openai/gpt-4o-mini',l:'GPT-4o Mini'},
       {v:'anthropic/claude-3.5-sonnet',l:'Claude 3.5 Sonnet'},
@@ -507,15 +507,6 @@ function renderSettingsPage(main) {
     '<input type="checkbox" id="s-ai"'+(s.aiEnabled?' checked':'')+' onchange="document.getElementById(\'s-or-key\').style.opacity=this.checked?\'1\':\'0.4\'">'+
     '<label for="s-ai" class="fs13" style="color:'+(hasAI?'var(--g)':'var(--tm)')+'">'+(hasAI?'\u2705 AI Analysis enabled':'Enable AI Analysis')+'</label>'+
     '</div></div>'+
-
-    '<div class="card mb16">'+
-    '<h3 class="fs14 fw600 mb12" style="cursor:pointer;display:flex;align-items:center;gap:8px" onclick="var e=document.getElementById(\'ext-apis\');e.style.display=e.style.display===\'none\'?\'\':\'none\'">\u{1f310} External APIs '+(vtKey||wpKey?'(\u2705 configured)':'(optional)')+' <span style="margin-left:auto;font-size:11px;color:var(--tm)">\u25bc</span></h3>'+
-    '<div id="ext-apis" style="display:none;padding-top:8px">'+
-    '<p class="fs12 mb12" style="color:var(--tm)">API keys enable automated vulnerability checks. Manual scanner links available on each site page.</p>'+
-    '<div class="flex flex-col gap12">'+
-    '<div><label class="lbl">VirusTotal API Key</label><input class="inp" type="password" id="s-vt-key" value="'+vtKey+'" placeholder="Free at virustotal.com"></div>'+
-    '<div><label class="lbl">WPScan API Key</label><input class="inp" type="password" id="s-wp-key" value="'+wpKey+'" placeholder="Free at wpscan.com"></div>'+
-    '</div></div></div>'+
 
     '<div class="card mb16">'+
     '<h3 class="fs14 fw600 mb16" style="display:flex;align-items:center;gap:8px">\u2699 Scan Configuration</h3>'+
